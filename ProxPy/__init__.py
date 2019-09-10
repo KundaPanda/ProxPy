@@ -43,6 +43,7 @@ class Judge(Enum):
     """
     Proxy judge enum
     """
+
     def __new__(cls, *args, **kwargs):
         value = len(cls.__members__) + 1
         obj = object.__new__(cls)
@@ -61,6 +62,7 @@ class Options:
     """
     options holder, you can set all the possible things here
     """
+
     def __init__(self, proxy_type=ProxyType.https, username="", password="", judge=Judge.azenv, proxy_check_threads=50,
                  check_timeout=4,
                  debug=False,
@@ -82,6 +84,7 @@ class Proxy:
     """
     class for one proxy, holds all workers bound to it, banned/dead status, raw address in a string and address formatted according to requests module
     """
+
     def __init__(self, proxy_address, proxy_type=ProxyType.https.name, user=None, password=None):
         self.proxy = proxy_address
         self.dead = False
