@@ -14,22 +14,25 @@ from bs4 import BeautifulSoup
 
 name = "ProxPy"
 
-root = tk.Tk()
-root.withdraw()
+_root = tk.Tk()
+_root.withdraw()
+_resetting = False
+_checked = []
+_host_ip = ""
 
-checked = []
 proxies = []
-resetting = False
 proxy_stats = {
     "suc": 0,
     "fail": 0,
     "alive": 0,
     "dead": 0
 }
-host_ip = ""
 
 
 class ProxyType(Enum):
+    """
+    enum specifying type of proxies being used
+    """
     http = 0
     https = 1
     socks5 = 2
@@ -37,6 +40,9 @@ class ProxyType(Enum):
 
 
 class Judge(Enum):
+    """
+    Proxy judge enum
+    """
     def __new__(cls, *args, **kwargs):
         value = len(cls.__members__) + 1
         obj = object.__new__(cls)
@@ -52,6 +58,9 @@ class Judge(Enum):
 
 
 class Options:
+    """
+    options holder, you can set all the possible things here
+    """
     def __init__(self, proxy_type=ProxyType.https, username="", password="", judge=Judge.azenv, proxy_check_threads=50,
                  check_timeout=4,
                  debug=False,
@@ -70,6 +79,9 @@ opts = Options()
 
 
 class Proxy:
+    """
+    class for one proxy, holds all workers bound to it, banned/dead status, raw address in a string and address formatted according to requests module
+    """
     def __init__(self, proxy_address, proxy_type=ProxyType.https.name, user=None, password=None):
         self.proxy = proxy_address
         self.dead = False
@@ -88,6 +100,13 @@ class Proxy:
 
 
 def prequest(method, url, **kwargs):
+    """
+    Sends a request to url with method method, using proxy bound to current thread
+    :param method: 'post' / 'get' / 'put' / ...
+    :param url: target url
+    :param kwargs: additional arguments (headers, payload, ...), if session is specified, it will be used to send the request
+    :return: requests.models.Response
+    """
     if "proxy" not in current_thread().__dict__:
         get_new_proxy()
     kwargs["proxies"] = current_thread().__dict__["proxy"].dict_proxy
@@ -118,16 +137,37 @@ def prequest(method, url, **kwargs):
 
 
 def pget(url, params=None, **kwargs):
+    """
+    send GET request to a url with a proxy bound to current thread
+    :param url: target url
+    :param params: request parameters
+    :param kwargs: additional arguments (headers, payload, ...), if session is specified, it will be used to send the request
+    :return: requests.models.Response
+    """
     kwargs.setdefault('allow_redirects', True)
     return prequest("get", url, params=params, **kwargs)
 
 
 def ppost(url, params=None, **kwargs):
+    """
+    send POST request to a url with a proxy bound to current thread
+    :param url: target url
+    :param params: request parameters
+    :param kwargs: additional arguments (headers, payload, ...), if session is specified, it will be used to send the request
+    :return: requests.models.Response
+    """
     kwargs.setdefault('allow_redirects', True)
     return prequest("get", url, params=params, **kwargs)
 
 
-def choose_from_enum(en, request_text="Please choose from following options:", default_number=0):
+def _choose_from_enum(en, request_text="Please choose from following options:", default_number=0):
+    """
+    show a menu for the user to choose from different enum possibilities
+    :param en: enum to choose from
+    :param request_text: request to be shown to the user
+    :param default_number: default enum value to be chosen
+    :return: en(default_number)
+    """
     print(request_text)
     if len(en) == 0:
         return None
@@ -144,7 +184,14 @@ def choose_from_enum(en, request_text="Please choose from following options:", d
     return en(default_number)
 
 
-def choose_from_list(lst: list, request_text="Please choose from following options:", default_number=0):
+def _choose_from_list(lst: list, request_text="Please choose from following options:", default_number=0):
+    """
+    show a menu for the user to choose from different list items
+    :param lst: list to choose from
+    :param request_text: request to be shown to the user
+    :param default_number: item at this index in the list will be chosen as default
+    :return: lst[default_number]
+    """
     print(request_text)
     if len(lst) == 0:
         return None
@@ -162,6 +209,11 @@ def choose_from_list(lst: list, request_text="Please choose from following optio
 
 
 def get_external_ip(p: Proxy = None):
+    """
+    determines the current external ip being used to connect to the internet
+    :param p: proxy to connect through
+    :return: None if connection error, else ipv4 in string
+    """
     global opts
     try:
         if p:
@@ -182,6 +234,11 @@ def get_external_ip(p: Proxy = None):
 
 
 def check_proxy(prx: str):
+    """
+    checks a proxy in string format [0-255].[0-255].[0-255].[0-255]:[0-65535]
+    :param prx: proxy as a string
+    :return: True if valid format else False
+    """
     spl = prx.split(".")
     if len(spl) != 4:
         return False
@@ -198,6 +255,12 @@ def check_proxy(prx: str):
 
 
 def get_new_proxy(dead=False, banned=False):
+    """
+    binds a new proxy from the internal proxy list to the current thread while possibly marking the old one as banned or dead
+    :param dead: current proxy dead?
+    :param banned: current proxy banned?
+    :return: None
+    """
     global opts
     if "proxy" in current_thread().__dict__.keys():
         if opts.debug:
@@ -213,12 +276,17 @@ def get_new_proxy(dead=False, banned=False):
 
 
 def test_proxy(prx: Proxy):
+    """
+    checks if proxy is working and anonymous
+    :param prx: proxy: Proxy class
+    :return: Proxy if working else False
+    """
     global opts
     ip = get_external_ip(prx)
     if not ip:
         if opts.debug:
             print("Proxy not working.")
-    elif ip != host_ip:
+    elif ip != _host_ip:
         return prx
     elif opts.debug:
         print("Proxy Non-Anonymous, skipping.")
@@ -226,20 +294,30 @@ def test_proxy(prx: Proxy):
 
 
 def proxy_on_checked(future):
-    global checked
+    """
+    callback for check threads, not to be called otherwise, updates stats and proxy list (checked list)
+    :param future: future object handling the current proxy check
+    :return: None
+    """
+    global _checked
     if not future.result():
         proxy_stats["dead"] += 1
     else:
         proxy_stats["alive"] += 1
-        checked.append(future.result())
+        _checked.append(future.result())
     if opts.show_progress:
         update_proxy_stats()
 
 
 def parse_proxies(proxy_file):
+    """
+    parses proxies from a file
+    :param proxy_file: VALID path to a text file containing proxies
+    :return: None
+    """
     global proxies, proxy_stats, opts
     if __name__ == '__main__':
-        opts.proxy_type = choose_from_enum(ProxyType, "Please choose type of proxies:", 1).name
+        opts.proxy_type = _choose_from_enum(ProxyType, "Please choose type of proxies:", 1).name
     if __name__ == '__main__':
         opts.username = input("Please enter username for proxies (blank for no login) -> ")
         if opts.username != "":
@@ -258,19 +336,27 @@ def parse_proxies(proxy_file):
 
 
 def check_proxies():
-    global proxies, checked, host_ip
+    """
+    checks all the parsed proxies
+    :return: None
+    """
+    global proxies, _checked, _host_ip
     if __name__ == "__main__":
-        opts.judge = choose_from_enum(Judge, "Please select a proxy judge:")
-    host_ip = get_external_ip()
+        opts.judge = _choose_from_enum(Judge, "Please select a proxy judge:")
+    _host_ip = get_external_ip()
     with ThreadPool(max_workers=opts.proxy_check_threads) as pool:
         for proxy in proxies:
             pool.submit(test_proxy, proxy).add_done_callback(proxy_on_checked)
-    proxies = checked
+    proxies = _checked
     if opts.show_progress:
         print()
 
 
 def print_proxy_stats():
+    """
+    prints out current progress in checking proxies, called first in code
+    :return: None
+    """
     global proxy_stats
     print(
         f"\nImported: {proxy_stats['suc']} | Dumped: {proxy_stats['fail']} | Dead: {proxy_stats['dead']} | Alive: {proxy_stats['alive']} | Running threads: {active_count() - 1} ",
@@ -278,6 +364,10 @@ def print_proxy_stats():
 
 
 def update_proxy_stats():
+    """
+    prints out current progress in checking proxies, called by finished threads
+    :return: None
+    """
     global proxy_stats
     print(
         f"\rImported: {proxy_stats['suc']} | Dumped: {proxy_stats['fail']} | Dead: {proxy_stats['dead']} | Alive: {proxy_stats['alive']} | Running threads: {active_count() - 1} ",
@@ -285,21 +375,29 @@ def update_proxy_stats():
 
 
 def reset_proxies():
-    global proxies, resetting, opts
-    if resetting:
-        while resetting:
+    """
+    resets all the proxies, locks other threads from doing so as well
+    :return: None
+    """
+    global proxies, _resetting, opts
+    if _resetting:
+        while _resetting:
             sleep(0.5)
         return
-    resetting = True
+    _resetting = True
     if opts.debug:
         print("Resetting proxies..")
     for p in proxies:
         p.banned = False
         p.dead = False
-    resetting = False
+    _resetting = False
 
 
 def get_proxy():
+    """
+    returns the first available proxy from proxies list
+    :return: Proxy class
+    """
     global proxies, opts
     i = 0
     while len(proxies[i].workers) >= 5 or proxies[i].dead or proxies[i].banned:
@@ -314,9 +412,22 @@ def get_proxy():
     return proxies[i]
 
 
-def open_proxy_file(options=opts):
-    global proxies, opts
+def update_options(options):
+    """
+    changes internal options to provided ones
+    :param options: Options class with all options set
+    :return: None
+    """
+    global opts
     opts = options
+
+
+def open_proxy_file():
+    """
+    opens a file dialog to choose the proxy file, parses it afterwards
+    :return: None
+    """
+    global proxies
     if __name__ == '__main__':
         print(
             "--------IMPORTANT--------\nRequired proxy format - '0.0.0.0:0', one per line ONLY\n--------IMPORTANT--------")
@@ -325,4 +436,7 @@ def open_proxy_file(options=opts):
 
 
 if __name__ == '__main__':
+    """
+    ^^
+    """
     open_proxy_file()

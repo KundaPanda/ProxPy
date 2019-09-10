@@ -2,7 +2,8 @@ import proxpy
 
 my_options = proxpy.Options(proxy_check_threads=200, check_timeout=5, judge=proxpy.Judge.azenv, show_progress=True)
 
-proxpy.open_proxy_file(options=my_options)
+proxpy.update_options(my_options)
+proxpy.open_proxy_file()
 proxpy.check_proxies()
 
 print(f"Alive: {proxpy.proxy_stats['alive']}, Dead: {proxpy.proxy_stats['dead']}")
