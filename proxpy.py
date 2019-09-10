@@ -12,6 +12,8 @@ from bs4 import BeautifulSoup
 
 # TODO: COMMENTS
 
+name = "ProxPy"
+
 root = tk.Tk()
 root.withdraw()
 
@@ -30,8 +32,8 @@ host_ip = ""
 class ProxyType(Enum):
     http = 0
     https = 1
-    socks4 = 2
-    socks5 = 3
+    socks5 = 2
+    socks5h = 3
 
 
 class Judge(Enum):
@@ -90,10 +92,10 @@ def prequest(method, url, **kwargs):
         get_new_proxy()
     kwargs["proxies"] = current_thread().__dict__["proxy"].dict_proxy
     if "session" in kwargs.keys():
-        sess = kwargs["session"]
+        session = kwargs["session"]
         del kwargs["session"]
     else:
-        sess = None
+        session = None
     if "max_retries" in kwargs.keys():
         max_retries = kwargs["max_retries"]
         del kwargs["max_retries"]
@@ -102,8 +104,8 @@ def prequest(method, url, **kwargs):
     retries = 0
     while True:
         try:
-            if sess:
-                response = sess.request(method, url, **kwargs)
+            if session:
+                response = session.request(method, url, **kwargs)
             else:
                 response = request(method, url, **kwargs)
             return response
