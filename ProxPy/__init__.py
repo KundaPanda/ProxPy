@@ -6,7 +6,7 @@ from tkinter import filedialog
 from enum import Enum
 from requests import request
 from requests.exceptions import RequestException, ProxyError, Timeout
-from concurrent.futures import ThreadPoolExecutor as ThreadPool
+from concurrent.futures import as_completed, ThreadPoolExecutor as ThreadPool
 import re
 from bs4 import BeautifulSoup
 
@@ -20,7 +20,6 @@ _resetting = False
 _checked = []
 _host_ip = ""
 
-proxies = []
 proxy_stats = {
     "suc": 0,
     "fail": 0,
@@ -33,10 +32,11 @@ class ProxyType(Enum):
     """
     enum specifying type of proxies being used
     """
-    http = 0
-    https = 1
-    socks5 = 2
-    socks5h = 3
+
+    socks5h = 0
+    socks5 = 1
+    https = 2
+    http = 3
 
 
 class Judge(Enum):
@@ -63,18 +63,19 @@ class Options:
     options holder, you can set all the possible things here
     """
 
-    def __init__(self, proxy_type=ProxyType.https, username="", password="", judge=Judge.azenv, proxy_check_threads=50,
+    def __init__(self, username="", password="", judge=Judge.azenv, proxy_check_threads=50,
                  check_timeout=4,
                  debug=False,
-                 show_progress=True):
+                 show_progress=True,
+                 workers_per_proxy=5):
         self.judge = judge
         self.proxy_check_threads = proxy_check_threads
         self.check_timeout = check_timeout
         self.debug = debug
-        self.proxy_type = proxy_type
         self.username = username
         self.password = password
         self.show_progress = show_progress
+        self.workers_per_proxy = workers_per_proxy
 
 
 opts = Options()
@@ -85,21 +86,76 @@ class Proxy:
     class for one proxy, holds all workers bound to it, banned/dead status, raw address in a string and address formatted according to requests module
     """
 
-    def __init__(self, proxy_address, proxy_type=ProxyType.https.name, user=None, password=None):
+    def __init__(self, proxy_address, proxy_type: ProxyType = ProxyType.https, user=None, password=None):
         self.proxy = proxy_address
         self.dead = False
         self.banned = False
         self.workers = []
         self.dict_proxy = {
-            "http": f"{proxy_type}://{user}:{password}@{proxy_address}",
-            "https": f"{proxy_type}://{user}:{password}@{proxy_address}",
+            "http": f"{proxy_type.name}://{user}:{password}@{proxy_address}",
+            "https": f"{proxy_type.name}://{user}:{password}@{proxy_address}",
         } if user != "" and password != "" else {
-            "http": f"{proxy_type}://{proxy_address}",
-            "https": f"{proxy_type}://{proxy_address}",
+            "http": f"{proxy_type.name}://{proxy_address}",
+            "https": f"{proxy_type.name}://{proxy_address}",
         }
+        self.type = proxy_type
 
     def __hash__(self):
         return self.proxy.__hash__()
+
+
+class ProxyList:
+    """
+    Holder of proxy lists for all supported proxy types
+    """
+    def __init__(self):
+        self.size = 0
+        self.dict = {
+            ProxyType.http: [],
+            ProxyType.https: [],
+            ProxyType.socks5: [],
+            ProxyType.socks5h: [],
+        }
+
+    def add_proxy(self, proxy: str, proxy_type: ProxyType = ProxyType.https):
+        """
+        add a proxy from string to the list
+        :param proxy: proxy in string format
+        :param proxy_type: type of proxy
+        :return: None
+        """
+        self.dict[proxy_type].append(Proxy(proxy, proxy_type, opts.username, opts.password))
+        self.size += 1
+
+    def add_proxy_class(self, proxy: Proxy):
+        """
+        add a proxy as an instance of Proxy class
+        :param proxy: proxy to be added, must have Proxy.type set!
+        :return: None
+        """
+        self.dict[proxy.type].append(proxy)
+        self.size += 1
+
+    def clear_proxies(self, proxy_type: ProxyType = ProxyType.https):
+        """
+        clears a proxy list of specific type
+        :param proxy_type: type of proxy list to clear
+        :return: None
+        """
+        self.size -= len(self.dict[proxy_type])
+        self.dict[proxy_type] = []
+
+    def update_size(self):
+        """
+        recalculate the number of proxies in total (after removing, adding without using the add_proxy method)
+        :return: None
+        """
+        self.size = 0
+        for plist in self.dict.values():
+            self.size += len(plist)
+
+
+proxy_list = ProxyList()
 
 
 def prequest(method, url, **kwargs):
@@ -122,7 +178,7 @@ def prequest(method, url, **kwargs):
         max_retries = kwargs["max_retries"]
         del kwargs["max_retries"]
     else:
-        max_retries = len(proxies)
+        max_retries = 50
     retries = 0
     while True:
         try:
@@ -132,6 +188,8 @@ def prequest(method, url, **kwargs):
                 response = request(method, url, **kwargs)
             return response
         except (Timeout, ProxyError):
+            if opts.debug:
+                print(f"Proxy {current_thread().__dict__['proxy'].proxy} dead, getting a new one.")
             get_new_proxy(dead=True)
             retries += 1
             if max_retries == retries:
@@ -231,7 +289,7 @@ def get_external_ip(p: Proxy = None):
             if args[i] == "REMOTE_ADDR":
                 return args[i + 1]
     except RequestException:
-        if opts.debug:
+        if opts.debug and p is None:
             print("Please make sure you have access to the internet and try again.")
     return None
 
@@ -266,8 +324,6 @@ def get_new_proxy(dead=False, banned=False):
     """
     global opts
     if "proxy" in current_thread().__dict__.keys():
-        if opts.debug:
-            print("Proxy down.", current_thread().__dict__["proxy"].proxy)
         if dead:
             current_thread().__dict__["proxy"].dead = True
         if banned:
@@ -288,7 +344,7 @@ def test_proxy(prx: Proxy):
     ip = get_external_ip(prx)
     if not ip:
         if opts.debug:
-            print("Proxy not working.")
+            print(f"Proxy {prx.proxy} not working.")
     elif ip != _host_ip:
         return prx
     elif opts.debug:
@@ -296,9 +352,10 @@ def test_proxy(prx: Proxy):
     return False
 
 
-def proxy_on_checked(future):
+def proxy_on_checked(future, threads: int):
     """
     callback for check threads, not to be called otherwise, updates stats and proxy list (checked list)
+    :param threads: number of threads currently running, passed from threadpoolexecutor
     :param future: future object handling the current proxy check
     :return: None
     """
@@ -309,16 +366,17 @@ def proxy_on_checked(future):
         proxy_stats["alive"] += 1
         _checked.append(future.result())
     if opts.show_progress:
-        update_proxy_stats()
+        update_proxy_stats(threads)
 
 
-def parse_proxies(proxy_file):
+def parse_proxies(proxy_file, proxy_type: ProxyType = ProxyType.https):
     """
     parses proxies from a file
+    :param proxy_type: type of proxies to be parsed
     :param proxy_file: VALID path to a text file containing proxies
     :return: None
     """
-    global proxies, proxy_stats, opts
+    global proxy_list, proxy_stats, opts
     if __name__ == '__main__':
         opts.proxy_type = _choose_from_enum(ProxyType, "Please choose type of proxies:", 1).name
     if __name__ == '__main__':
@@ -329,28 +387,39 @@ def parse_proxies(proxy_file):
         for line in p_file.readlines():
             line = line.strip()
             if check_proxy(line):
-                proxies.append(Proxy(line, opts.proxy_type.name, opts.username, opts.password))
+                proxy_list.add_proxy(line, proxy_type)
                 proxy_stats["suc"] += 1
             else:
                 proxy_stats["fail"] += 1
-    proxies = list(unique(proxies, key=lambda x: x.__hash__()))
+    proxy_list.dict[proxy_type] = list(unique(proxy_list.dict[proxy_type], key=lambda x: x.__hash__()))
+    proxy_list.update_size()
     if opts.show_progress:
-        print(f"\nSuccessfully parsed: {proxy_stats['suc'] - proxy_stats['dead']} proxies.")
+        print(f"\nSuccessfully parsed: {proxy_stats['suc'] - proxy_stats['dead']} {proxy_type.name} proxies.")
 
 
 def check_proxies():
     """
-    checks all the parsed proxies
+    checks all the parsed proxies - all the types
     :return: None
     """
-    global proxies, _checked, _host_ip
+    global proxy_list, _checked, _host_ip
     if __name__ == "__main__":
         opts.judge = _choose_from_enum(Judge, "Please select a proxy judge:")
     _host_ip = get_external_ip()
     with ThreadPool(max_workers=opts.proxy_check_threads) as pool:
-        for proxy in proxies:
-            pool.submit(test_proxy, proxy).add_done_callback(proxy_on_checked)
-    proxies = _checked
+        for proxy_type in ProxyType:
+            if len(proxy_list.dict[proxy_type]) == 0:
+                continue
+            futures = {pool.submit(test_proxy, proxy): proxy for proxy in proxy_list.dict[proxy_type]}
+            # for proxy in proxy_list.dict[proxy_type]:
+            #     pool.submit(test_proxy, proxy).add_done_callback(proxy_on_checked)
+            if opts.show_progress:
+                print(f"\nCurrently checking {proxy_type.name} proxies:")
+            for future in as_completed(futures):
+                proxy_on_checked(future, len(pool._threads))
+            proxy_list.dict[proxy_type] = _checked
+            _checked = []
+            proxy_list.update_size()
     if opts.show_progress:
         print()
 
@@ -362,18 +431,18 @@ def print_proxy_stats():
     """
     global proxy_stats
     print(
-        f"\nImported: {proxy_stats['suc']} | Dumped: {proxy_stats['fail']} | Dead: {proxy_stats['dead']} | Alive: {proxy_stats['alive']} | Running threads: {active_count() - 1} ",
+        f"\nImported: {proxy_stats['suc']} | Dumped: {proxy_stats['fail']} | Dead: {proxy_stats['dead']} | Alive: {proxy_stats['alive']} | Running threads: 0 ",
         end="")
 
 
-def update_proxy_stats():
+def update_proxy_stats(threads: int):
     """
     prints out current progress in checking proxies, called by finished threads
     :return: None
     """
     global proxy_stats
     print(
-        f"\rImported: {proxy_stats['suc']} | Dumped: {proxy_stats['fail']} | Dead: {proxy_stats['dead']} | Alive: {proxy_stats['alive']} | Running threads: {active_count() - 1} ",
+        f"\rImported: {proxy_stats['suc']} | Dumped: {proxy_stats['fail']} | Dead: {proxy_stats['dead']} | Alive: {proxy_stats['alive']} | Running threads: {threads} ",
         end="")
 
 
@@ -382,7 +451,7 @@ def reset_proxies():
     resets all the proxies, locks other threads from doing so as well
     :return: None
     """
-    global proxies, _resetting, opts
+    global proxy_list, _resetting, opts
     if _resetting:
         while _resetting:
             sleep(0.5)
@@ -390,29 +459,37 @@ def reset_proxies():
     _resetting = True
     if opts.debug:
         print("Resetting proxies..")
-    for p in proxies:
-        p.banned = False
-        p.dead = False
+    for proxy_type in ProxyType:
+        for p in proxy_list.dict[proxy_type]:
+            p.banned = False
+            p.dead = False
     _resetting = False
 
 
 def get_proxy():
     """
-    returns the first available proxy from proxies list
-    :return: Proxy class
+    returns the first available proxy from proxies list, resets if all banned
+    :return: Proxy class or None if proxy list is empty
     """
-    global proxies, opts
-    i = 0
-    while len(proxies[i].workers) >= 5 or proxies[i].dead or proxies[i].banned:
-        i += 1
-        if i >= len(proxies):
-            if opts.debug:
-                print("Out of proxies", end="")
-            reset_proxies()
-            i = 0
-    if opts.debug:
-        print(f"New proxy {proxies[i].proxy}")
-    return proxies[i]
+    global proxy_list, opts
+    if proxy_list.size == 0:
+        return None
+    while 1:
+        for proxy_type in ProxyType:
+            for i in range(len(proxy_list.dict[proxy_type])):
+                if len(proxy_list.dict[proxy_type][i].workers) < opts.workers_per_proxy and not \
+                        proxy_list.dict[proxy_type][i].dead and not proxy_list.dict[proxy_type][i].banned:
+                    if opts.debug:
+                        print(f"New proxy {proxy_list.dict[proxy_type][i].proxy}")
+                    return proxy_list.dict[proxy_type][i]
+        if opts.debug:
+            print("Out of proxies", end="")
+        if 1.2 * opts.workers_per_proxy * (active_count() - 1) >= proxy_list.size:
+            # do not reset proxies when there are more threads than proxies possibly available to them, up to 20% banned is ok
+            # will change this later to something more sophisticated
+            sleep(0.5)
+            continue
+        reset_proxies()
 
 
 def update_options(options):
@@ -425,17 +502,17 @@ def update_options(options):
     opts = options
 
 
-def open_proxy_file():
+def open_proxy_file(proxy_type: ProxyType = ProxyType.https):
     """
     opens a file dialog to choose the proxy file, parses it afterwards
     :return: None
     """
-    global proxies
+    global proxy_list
     if __name__ == '__main__':
         print(
             "--------IMPORTANT--------\nRequired proxy format - '0.0.0.0:0', one per line ONLY\n--------IMPORTANT--------")
     proxies_file = filedialog.askopenfilename(title="Select proxy file.", filetypes=[("Text files", "*.txt")])
-    parse_proxies(proxies_file)
+    parse_proxies(proxies_file, proxy_type)
 
 
 if __name__ == '__main__':

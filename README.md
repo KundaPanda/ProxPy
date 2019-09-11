@@ -20,16 +20,18 @@ class ProxyType(Enum):
     """
     enum specifying type of proxies being used
     """
-    http = 0
-    https = 1
-    socks5 = 2
-    socks5h = 3
+    
+    socks5h = 0
+    socks5 = 1
+    https = 2
+    http = 3
 ```
 ```python
 class Judge(Enum):
     """
     Proxy judge enum
     """
+    
     azenv = "https://azenv.net"
     proxyjudge = "http://proxyjudge.info"
 ```
@@ -38,38 +40,110 @@ class Options:
     """
     options holder, you can set all the possible things here
     """
-    def __init__(self, 
-                 proxy_type=ProxyType.https,
-                 username="", 
-                 password="", 
-                 judge=Judge.azenv, 
-                 proxy_check_threads=50,
+
+    def __init__(self, username="", password="", judge=Judge.azenv, proxy_check_threads=50,
                  check_timeout=4,
                  debug=False,
-                 show_progress=True):
+                 show_progress=True,
+                 workers_per_proxy=5):
         self.judge = judge
         self.proxy_check_threads = proxy_check_threads
         self.check_timeout = check_timeout
         self.debug = debug
-        self.proxy_type = proxy_type
         self.username = username
         self.password = password
         self.show_progress = show_progress
+        self.workers_per_proxy = workers_per_proxy
 ```
 ```python
 class Proxy:
     """
     class for one proxy, holds all workers bound to it, banned/dead status, raw address in a string and address formatted according to requests module
     """
-    def __init__(self, proxy_address, proxy_type=ProxyType.https.name, user=None, password=None):
+
+    def __init__(self, proxy_address, proxy_type: ProxyType = ProxyType.https, user=None, password=None):
         self.proxy = proxy_address
         self.dead = False
         self.banned = False
         self.workers = []
         self.dict_proxy = {
-            "http": f"{proxy_type}://{user}:{password}@{proxy_address}",
-            "https": f"{proxy_type}://{user}:{password}@{proxy_address}",
+            "http": f"{proxy_type.name}://{user}:{password}@{proxy_address}",
+            "https": f"{proxy_type.name}://{user}:{password}@{proxy_address}",
         }
+        self.type = proxy_type
+```
+```python
+class ProxyList:
+    """
+    Holder of proxy lists for all supported proxy types
+    """
+    def __init__(self):
+        self.size = 0
+        self.dict = {
+            ProxyType.http: [],
+            ProxyType.https: [],
+            ProxyType.socks5: [],
+            ProxyType.socks5h: [],
+        }
+
+    #
+    # ---**METHODS**---
+    #
+    def add_proxy(self, proxy: str, proxy_type: ProxyType = ProxyType.https):
+        """
+        add a proxy from string to the list
+        :param proxy: proxy in string format
+        :param proxy_type: type of proxy
+        :return: None
+        """
+        self.dict[proxy_type].append(Proxy(proxy, proxy_type, opts.username, opts.password))
+        self.size += 1
+
+    def add_proxy_class(self, proxy: Proxy):
+        """
+        add a proxy as an instance of Proxy class
+        :param proxy: proxy to be added, must have Proxy.type set!
+        :return: None
+        """
+        self.dict[proxy.type].append(proxy)
+        self.size += 1
+
+    def clear_proxies(self, proxy_type: ProxyType = ProxyType.https):
+        """
+        clears a proxy list of specific type
+        :param proxy_type: type of proxy list to clear
+        :return: None 
+        """
+        self.size -= len(self.dict[proxy_type])
+        self.dict[proxy_type] = []
+
+    def update_size(self):
+        """
+        recalculate the number of proxies in total (after removing, adding without using the add_proxy method)
+        :return: None
+        """
+        self.size = 0
+        for plist in self.dict.values():
+            self.size += len(plist)
+```
+```python
+# Internal variables:
+# these are used by all the functions, can be accessed freely, should not be modified directly
+
+proxy_list = ProxyList()
+opts = Options()
+
+_root = tk.Tk()
+_resetting = False
+_checked = []
+_host_ip = ""
+
+proxy_stats = {
+    "suc": 0,
+    "fail": 0,
+    "alive": 0,
+    "dead": 0
+}
 ```
 ## Methods:
 #### **All with simplified functionality**
@@ -145,9 +219,10 @@ def test_proxy(prx: Proxy):
     return prx if prx.working else False
 ```
 ```python
-def parse_proxies(proxy_file):
+def parse_proxies(proxy_file, proxy_type: ProxyType = ProxyType.https):
     """
     parses proxies from a file
+    :param proxy_type: type of proxies to be parsed
     :param proxy_file: VALID path to a text file containing proxies
     :return: None
     """
@@ -158,7 +233,7 @@ def parse_proxies(proxy_file):
 
 def check_proxies():
     """
-    checks all the parsed proxies
+    checks all the parsed proxies - all the types
     :return: None
     """
     for proxy in proxies:
@@ -177,8 +252,8 @@ def reset_proxies():
 ```python
 def get_proxy():
     """
-    returns the first available proxy from proxies list
-    :return: Proxy class
+    returns the first available proxy from proxies list, resets if all banned
+    :return: Proxy class or None if proxy list is empty
     """
     for proxy in proxies:
         if proxy.available:
@@ -195,7 +270,7 @@ def update_options(options):
     opts = options
 ```
 ```python
-def open_proxy_file():
+def open_proxy_file(proxy_type: ProxyType = ProxyType.https):
     """
     opens a file dialog to choose the proxy file, parses it afterwards
     :return: None

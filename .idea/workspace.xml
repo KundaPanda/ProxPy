@@ -2,12 +2,12 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="bbd14f6b-5a6b-42d9-9214-7155bb0dd3ad" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/5" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/ProxPy/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/examples/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/ProxPy.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/ProxPy.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dictionaries/vojdo.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dictionaries/vojdo.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ProxPy/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/ProxPy/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/examples/simple_get.py" beforeDir="false" afterPath="$PROJECT_DIR$/examples/simple_get.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/proxpy.py" beforeDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -34,7 +34,8 @@
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
     <property name="last_opened_file_path" value="$PROJECT_DIR$" />
-    <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
+    <property name="restartRequiresConfirmation" value="false" />
+    <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PythonContentEntriesConfigurable" />
   </component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
@@ -117,7 +118,9 @@
       <updated>1568129408802</updated>
       <workItem from="1568129411880" duration="42000" />
       <workItem from="1568129499073" duration="9001000" />
-      <workItem from="1568146317301" duration="3853000" />
+      <workItem from="1568146317301" duration="4228000" />
+      <workItem from="1568202716382" duration="5143000" />
+      <workItem from="1568207908652" duration="1545000" />
     </task>
     <servers />
   </component>
@@ -129,7 +132,9 @@
       <map>
         <entry key="MAIN">
           <value>
-            <State />
+            <State>
+              <option name="COLUMN_ORDER" />
+            </State>
           </value>
         </entry>
       </map>
@@ -140,6 +145,6 @@
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/ProxPy$proxpy.coverage" NAME="proxpy Coverage Results" MODIFIED="1568134310138" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/ProxPy$simple_get.coverage" NAME="simple_get Coverage Results" MODIFIED="1568135870453" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/examples" />
+    <SUITE FILE_PATH="coverage/ProxPy$simple_get.coverage" NAME="simple_get Coverage Results" MODIFIED="1568208816317" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/examples" />
   </component>
 </project>
