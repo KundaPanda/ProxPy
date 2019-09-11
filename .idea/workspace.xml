@@ -2,12 +2,10 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="bbd14f6b-5a6b-42d9-9214-7155bb0dd3ad" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/ProxPy.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/ProxPy.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dictionaries/vojdo.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dictionaries/vojdo.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/rebuild_and_upload.bat" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ProxPy/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/ProxPy/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/simple_get.py" beforeDir="false" afterPath="$PROJECT_DIR$/examples/simple_get.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/setup.py" beforeDir="false" afterPath="$PROJECT_DIR$/setup.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -120,7 +118,7 @@
       <workItem from="1568129499073" duration="9001000" />
       <workItem from="1568146317301" duration="4228000" />
       <workItem from="1568202716382" duration="5143000" />
-      <workItem from="1568207908652" duration="1545000" />
+      <workItem from="1568207908652" duration="2115000" />
     </task>
     <servers />
   </component>

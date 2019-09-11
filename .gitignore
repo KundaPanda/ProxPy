@@ -121,3 +121,5 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+rebuild_and_upload.bat
