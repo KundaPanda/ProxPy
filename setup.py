@@ -8,7 +8,7 @@ with open("requirements.txt", "r") as req:
 
 setuptools.setup(
     name="ProxPy",
-    version="0.0.2",
+    version="0.0.2a",
     author="KundaPanda",
     author_email="vojdoh@gmail.com",
     description="Python multithreading-ready proxy wrapper",
